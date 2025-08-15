@@ -19,63 +19,54 @@ app.use(cookieParser());
 app.use(
   cors({
     origin: process.env.NODE_ENV === "production" 
-      ? true  // Allow all origins in production for now
+      ? true
       : "http://localhost:5173",
     credentials: true,
   })
 );
 
-// API Routes
+// API Routes - Must come BEFORE static file serving
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 
-// Health check route
-app.get("/health", (req, res) => {
-  res.status(200).json({ status: "OK", message: "Server is running" });
+// Health check
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ status: "Server is running!" });
 });
 
 // Production static file serving
 if (process.env.NODE_ENV === "production") {
-  const frontendPath = path.join(__dirname, "../frontend/dist");
+  const frontendDistPath = path.join(__dirname, "../frontend/dist");
   
-  // Serve static files
-  app.use(express.static(frontendPath));
+  // Serve static files (CSS, JS, images, etc.)
+  app.use(express.static(frontendDistPath));
   
-  // Simple fallback for client-side routing - NO WILDCARDS
-  app.use((req, res, next) => {
-    // If it's an API request, skip to next middleware
-    if (req.path.startsWith('/api')) {
-      return next();
-    }
-    
-    // For all other requests, serve the React app
-    const indexPath = path.join(frontendPath, 'index.html');
+  // Catch-all handler: send back React's index.html file for any non-API routes
+  app.get(/^(?!\/api).*/, (req, res) => {
+    const indexPath = path.join(frontendDistPath, "index.html");
     res.sendFile(indexPath, (err) => {
       if (err) {
-        console.error('Error serving index.html:', err);
-        res.status(404).send('Page not found');
+        console.error("Error serving index.html:", err);
+        res.status(500).send("Error loading the app");
       }
     });
   });
 }
 
-// 404 handler for API routes only
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api')) {
-    res.status(404).json({ message: "API endpoint not found" });
-  } else {
-    next();
-  }
+// Handle 404 for API routes
+app.use("/api/*", (req, res) => {
+  res.status(404).json({ message: "API endpoint not found" });
 });
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error('Server Error:', err);
+  console.error("Server Error:", err);
   res.status(500).json({ message: "Internal Server Error" });
 });
 
 server.listen(PORT, () => {
-  console.log(`Server is running on PORT: ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🚀 Server running on PORT: ${PORT}`);
+  console.log(`📁 Serving static files from: ${path.join(__dirname, "../frontend/dist")}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   connectDB();
 });
