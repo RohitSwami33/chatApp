@@ -25,7 +25,7 @@ app.use(
   })
 );
 
-// API Routes - Must come BEFORE static file serving
+// API Routes - MUST BE FIRST
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 
@@ -41,20 +41,46 @@ if (process.env.NODE_ENV === "production") {
   // Serve static files (CSS, JS, images, etc.)
   app.use(express.static(frontendDistPath));
   
-  // Catch-all handler: send back React's index.html file for any non-API routes
-  app.get(/^(?!\/api).*/, (req, res) => {
-    const indexPath = path.join(frontendDistPath, "index.html");
-    res.sendFile(indexPath, (err) => {
+  // Handle specific common routes first
+  app.get("/", (req, res) => {
+    res.sendFile(path.join(frontendDistPath, "index.html"));
+  });
+  
+  app.get("/login", (req, res) => {
+    res.sendFile(path.join(frontendDistPath, "index.html"));
+  });
+  
+  app.get("/signup", (req, res) => {
+    res.sendFile(path.join(frontendDistPath, "index.html"));
+  });
+  
+  app.get("/profile", (req, res) => {
+    res.sendFile(path.join(frontendDistPath, "index.html"));
+  });
+  
+  app.get("/settings", (req, res) => {
+    res.sendFile(path.join(frontendDistPath, "index.html"));
+  });
+  
+  // Fallback middleware for any other non-API routes
+  app.use((req, res, next) => {
+    // Skip API routes
+    if (req.path.startsWith('/api/')) {
+      return next();
+    }
+    
+    // For all other routes, serve React app
+    res.sendFile(path.join(frontendDistPath, "index.html"), (err) => {
       if (err) {
         console.error("Error serving index.html:", err);
-        res.status(500).send("Error loading the app");
+        res.status(500).send("Error loading page");
       }
     });
   });
 }
 
-// Handle 404 for API routes
-app.use("/api/*", (req, res) => {
+// 404 handler for API routes only
+app.use("/api", (req, res) => {
   res.status(404).json({ message: "API endpoint not found" });
 });
 
@@ -66,7 +92,7 @@ app.use((err, req, res, next) => {
 
 server.listen(PORT, () => {
   console.log(`🚀 Server running on PORT: ${PORT}`);
-  console.log(`📁 Serving static files from: ${path.join(__dirname, "../frontend/dist")}`);
+  console.log(`📁 Static files: ${path.join(__dirname, "../frontend/dist")}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   connectDB();
 });
