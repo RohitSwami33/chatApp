@@ -19,48 +19,59 @@ app.use(cookieParser());
 app.use(
   cors({
     origin: process.env.NODE_ENV === "production" 
-      ? process.env.CLIENT_URL || "https://your-deployed-frontend-url.com"
+      ? true  // Allow all origins in production for now
       : "http://localhost:5173",
     credentials: true,
   })
 );
 
-// API Routes - Define these BEFORE the catch-all route
+// API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 
+// Health check route
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "OK", message: "Server is running" });
+});
+
 // Production static file serving
 if (process.env.NODE_ENV === "production") {
-  // Serve static files from React build
-  app.use(express.static(path.join(__dirname, "../frontend/dist")));
+  const frontendPath = path.join(__dirname, "../frontend/dist");
   
-  // Handle client-side routing - BEST SOLUTION
-  // This catches all non-API routes and serves the React app
-  app.get("*", (req, res, next) => {
-    // Skip API routes
-    if (req.path.startsWith('/api/')) {
+  // Serve static files
+  app.use(express.static(frontendPath));
+  
+  // Simple fallback for client-side routing - NO WILDCARDS
+  app.use((req, res, next) => {
+    // If it's an API request, skip to next middleware
+    if (req.path.startsWith('/api')) {
       return next();
     }
     
-    // Serve React app for all other routes
-    res.sendFile(path.join(__dirname, "../frontend/dist/index.html"), (err) => {
+    // For all other requests, serve the React app
+    const indexPath = path.join(frontendPath, 'index.html');
+    res.sendFile(indexPath, (err) => {
       if (err) {
         console.error('Error serving index.html:', err);
-        res.status(500).send('Error loading page');
+        res.status(404).send('Page not found');
       }
     });
   });
 }
 
-// Error handling middleware
+// 404 handler for API routes only
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    res.status(404).json({ message: "API endpoint not found" });
+  } else {
+    next();
+  }
+});
+
+// Global error handler
 app.use((err, req, res, next) => {
   console.error('Server Error:', err);
   res.status(500).json({ message: "Internal Server Error" });
-});
-
-// 404 handler for API routes
-app.use('/api/*', (req, res) => {
-  res.status(404).json({ message: "API route not found" });
 });
 
 server.listen(PORT, () => {
